@@ -1,0 +1,134 @@
+﻿@page "/"
+@using Microsoft.AspNetCore.Components.Forms;
+@using Karambolo.PO;
+@using System.Text
+@inject IJSRuntime Js
+
+<h1>LinguaTable translation tool</h1>
+
+Upload .po files:
+<InputFile OnChange="@HandleSelectedFiles" multiple />
+
+<div>
+    Uploaded files:
+    <ul>
+        @for (var i = 0; i < Files.Count; i++)
+        {
+            var fileIdx = i;
+            var file = Files[fileIdx];
+            <li>
+                @file.FileName - <button @onclick="() => RemoveFile(fileIdx)">Remove</button>
+            </li>
+        }
+    </ul>
+</div>
+
+<button @onclick="DownloadCsv">Download CSV</button>
+
+@code {
+    public Dictionary<string, List<string>> Translations = new();
+    public List<FileData> Files = new();
+    public IDictionary<string, string> Headers = new Dictionary<string, string>();
+
+    public class FileData
+    {
+        public string FileName { get; set; } = default!;
+        public string FileContent { get; set; } = default!;
+    }
+
+    public void RemoveFile(int i)
+    {
+        Files.RemoveAt(i);
+    }
+
+    private async Task HandleSelectedFiles(InputFileChangeEventArgs e)
+    {
+        Translations = new();
+        Console.WriteLine("HandleSelectedFiles");
+        foreach (var file in e.GetMultipleFiles())
+        {
+            var fileContent = await ReadFile(file);
+            Files.Add(new FileData()
+            {
+                FileName = file.Name,
+                FileContent = fileContent
+            });
+            var parser = new POParser(new POParserSettings());
+            var parseResult = parser.Parse(fileContent);
+            Headers = parseResult.Catalog.Headers;
+            if (!parseResult.Success)
+            {
+                throw new ArgumentException("File could not be parsed!");    
+            }
+            foreach (var entry in parseResult.Catalog.Values)
+            {
+                if (string.IsNullOrWhiteSpace(entry.Key.Id)) continue;
+                if (!Translations.ContainsKey(entry.Key.Id))
+                {
+                    Translations[entry.Key.Id] = new List<string>();
+                }
+                Translations[entry.Key.Id].AddRange(entry);
+            }
+            
+            Console.WriteLine("Reading complete");
+            
+            
+        }
+    }
+    
+    public static async Task<string> ReadFile(IBrowserFile file)
+    {
+        var result = new StringBuilder();
+        var buffer = new char[1024];
+        int read;
+
+        using var reader = new StreamReader(file.OpenReadStream(), Encoding.UTF8);
+        while ((read = await reader.ReadAsync(buffer, 0, buffer.Length)) > 0)
+        {
+            result.Append(buffer, 0, read);
+        }
+
+        return result.ToString();
+    }
+
+
+    public static string ConvertToCsv(Dictionary<string, List<string>> translations)
+    {
+        var csv = new StringBuilder();
+        csv.AppendLine("Key,Translation1,Translation2,..."); // Adjust header based on max translations
+
+        foreach (var entry in translations)
+        {
+            var line = new StringBuilder();
+            line.Append(EscapeCsvField(entry.Key)); // Key
+
+            foreach (var translation in entry.Value)
+            {
+                line.Append($",{EscapeCsvField(translation)}"); // Translation
+            }
+
+            csv.AppendLine(line.ToString());
+        }
+
+        return csv.ToString();
+    }
+    
+    private static string EscapeCsvField(string field)
+    {
+        if (field.Contains(",") || field.Contains("\""))
+        {
+            // Escape double quotes and enclose the field in double quotes
+            // return $"\"{field.Replace("\"", "\"\"")}\"";
+        }
+        return field;
+    }
+    
+    
+    private async Task DownloadCsv()
+    {
+        string csvContent = ConvertToCsv(Translations);
+        // Use JavaScript to click the link
+        await Js.InvokeVoidAsync("downloadCsvFile", csvContent, "translations.csv");
+    }
+    
+}
