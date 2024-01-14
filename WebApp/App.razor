@@ -1,7 +1,14 @@
 ﻿<Router AppAssembly="@typeof(App).Assembly">
     <Found Context="routeData">
-        <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)"/>
-        <FocusOnNavigate RouteData="@routeData" Selector="h1"/>
+        <header class="fixed-top px-4 m-n2" style="height: 60px; z-index: 20; box-shadow: 0 3px 6px 0 rgba(50,50,50,.3);">
+            <nav class="h-100 d-flex align-items-center">
+                <h1>LinguaTable</h1>
+            </nav>
+        </header>
+        <div class="p-2" style="margin-top: 60px">
+            <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)"/>
+            <FocusOnNavigate RouteData="@routeData" Selector="h1"/>
+        </div>
     </Found>
     <NotFound>
         <PageTitle>Not found</PageTitle>

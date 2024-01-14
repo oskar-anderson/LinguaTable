@@ -4,29 +4,36 @@
 @using System.Text
 @inject IJSRuntime Js
 
-<h1>LinguaTable translation tool</h1>
-
-Upload .po files:
-<InputFile OnChange="@HandleSelectedFiles" multiple />
-
-<div>
-    Uploaded files:
-    <ul>
-        @for (var i = 0; i < Files.Count; i++)
-        {
-            var fileIdx = i;
-            var file = Files[fileIdx];
-            <li>
-                @file.FileName - <button @onclick="() => RemoveFile(fileIdx)">Remove</button>
-            </li>
-        }
-    </ul>
+<div class="d-flex flex-column align-items-center">
+    <h2 class="fw-bold">Convert PO files</h2>
+    <p>Convert .po translation files to .csv format</p>
 </div>
 
-<button @onclick="DownloadCsv">Download CSV</button>
+@if (Files.Count == 0)
+{
+    <InputFileUpload OnChange="@HandleSelectedFiles" Title="Upload images" />
+}
+else
+{
+    <div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px;">
+            @for (var i = 0; i < Files.Count; i++)
+            {
+                var fileIdx = i;
+                var file = Files[fileIdx];
+                <div class="p-2 card d-flex flex-row justify-content-between">
+                    <span class="d-flex align-items-center">@file.FileName</span>
+                    <button @onclick="() => RemoveFile(fileIdx)" class="btn btn-danger">X</button>
+                </div>
+            }
+        </div>
+    </div>
+    
+    <button class="btn btn-primary mt-2" @onclick="DownloadCsv">Download CSV</button>
+}
 
 @code {
-    public Dictionary<string, List<string>> Translations = new();
+    public Dictionary<POKey, List<string>> Translations = new();
     public List<FileData> Files = new();
     public IDictionary<string, string> Headers = new Dictionary<string, string>();
 
@@ -45,6 +52,12 @@ Upload .po files:
     {
         Translations = new();
         Console.WriteLine("HandleSelectedFiles");
+        Console.WriteLine(string.Join(", ", e.GetMultipleFiles().Select(x => x.Name).ToArray()));
+        if (! e.GetMultipleFiles().All(file => file.Name.EndsWith(".po")))
+        {
+            Console.WriteLine("Wrong file type uploaded!");
+            return;
+        }
         foreach (var file in e.GetMultipleFiles())
         {
             var fileContent = await ReadFile(file);
@@ -62,12 +75,11 @@ Upload .po files:
             }
             foreach (var entry in parseResult.Catalog.Values)
             {
-                if (string.IsNullOrWhiteSpace(entry.Key.Id)) continue;
-                if (!Translations.ContainsKey(entry.Key.Id))
+                if (!Translations.ContainsKey(entry.Key))
                 {
-                    Translations[entry.Key.Id] = new List<string>();
+                    Translations[entry.Key] = new List<string>();
                 }
-                Translations[entry.Key.Id].AddRange(entry);
+                Translations[entry.Key].AddRange(entry);
             }
             
             Console.WriteLine("Reading complete");
@@ -92,15 +104,16 @@ Upload .po files:
     }
 
 
-    public static string ConvertToCsv(Dictionary<string, List<string>> translations)
+    public static string ConvertToCsv(Dictionary<POKey, List<string>> translations, List<string> fileNames)
     {
         var csv = new StringBuilder();
-        csv.AppendLine("Key,Translation1,Translation2,..."); // Adjust header based on max translations
+        csv.AppendLine($"Id,Context,{string.Join(",", fileNames)}");
 
         foreach (var entry in translations)
         {
             var line = new StringBuilder();
-            line.Append(EscapeCsvField(entry.Key)); // Key
+            line.Append(EscapeCsvField(entry.Key.Id));
+            line.Append(EscapeCsvField($",{entry.Key.ContextId ?? ""}"));
 
             foreach (var translation in entry.Value)
             {
@@ -126,7 +139,7 @@ Upload .po files:
     
     private async Task DownloadCsv()
     {
-        string csvContent = ConvertToCsv(Translations);
+        string csvContent = ConvertToCsv(Translations, Files.Select(file => file.FileName).ToList());
         // Use JavaScript to click the link
         await Js.InvokeVoidAsync("downloadCsvFile", csvContent, "translations.csv");
     }
