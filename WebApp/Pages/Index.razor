@@ -2,6 +2,9 @@
 @using Microsoft.AspNetCore.Components.Forms;
 @using Karambolo.PO;
 @using System.Text
+@using System.Globalization
+@using CsvHelper
+@using CsvHelper.Configuration
 @inject IJSRuntime Js
 
 <div class="d-flex flex-column align-items-center">
@@ -29,7 +32,7 @@ else
         </div>
     </div>
     
-    <button class="btn btn-primary mt-2" @onclick="DownloadCsv">Download CSV</button>
+    <button class="btn btn-primary mt-2" @onclick="DownloadCsv">Convert to CSV</button>
 }
 
 @code {
@@ -106,37 +109,36 @@ else
 
     public static string ConvertToCsv(Dictionary<POKey, List<string>> translations, List<string> fileNames)
     {
-        var csv = new StringBuilder();
-        csv.AppendLine($"Id,Context,{string.Join(",", fileNames)}");
+        using var memoryStream = new MemoryStream();
+        using var streamWriter = new StreamWriter(memoryStream, new UTF8Encoding(true));
+        using var csvWriter = new CsvWriter(streamWriter, new CsvConfiguration(CultureInfo.InvariantCulture));
+        // Write the header
+        csvWriter.WriteField("Id");
+        csvWriter.WriteField("Context");
+        foreach (var fileName in fileNames)
+        {
+            csvWriter.WriteField(fileName);
+        }
+        csvWriter.NextRecord();
 
+        // Write each record
         foreach (var entry in translations)
         {
-            var line = new StringBuilder();
-            line.Append(EscapeCsvField(entry.Key.Id));
-            line.Append(EscapeCsvField($",{entry.Key.ContextId ?? ""}"));
+            csvWriter.WriteField(entry.Key.Id);
+            csvWriter.WriteField(entry.Key.ContextId);
 
             foreach (var translation in entry.Value)
             {
-                line.Append($",{EscapeCsvField(translation)}"); // Translation
+                csvWriter.WriteField(translation);
             }
-
-            csv.AppendLine(line.ToString());
+            csvWriter.NextRecord();
         }
 
-        return csv.ToString();
+        streamWriter.Flush();
+        return Encoding.UTF8.GetString(memoryStream.ToArray());
     }
-    
-    private static string EscapeCsvField(string field)
-    {
-        if (field.Contains(",") || field.Contains("\""))
-        {
-            // Escape double quotes and enclose the field in double quotes
-            // return $"\"{field.Replace("\"", "\"\"")}\"";
-        }
-        return field;
-    }
-    
-    
+
+
     private async Task DownloadCsv()
     {
         string csvContent = ConvertToCsv(Translations, Files.Select(file => file.FileName).ToList());
