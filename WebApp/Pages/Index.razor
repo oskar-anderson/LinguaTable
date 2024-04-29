@@ -7,14 +7,14 @@
 @using CsvHelper.Configuration
 @inject IJSRuntime Js
 
-<div class="d-flex flex-column align-items-center">
-    <h2 class="fw-bold">Convert PO files</h2>
-    <p>Convert .po translation files to .csv format</p>
+<div class="d-flex flex-column align-items-center mx-auto" style="max-width: 800px">
+    <h1 class="fw-bold pt-3" style="color: #33333b;">Convert PO to CSV</h1>
+    <span class="fs-5 text-center">Stop wasting time manually editing translation files, store translations in a spreadsheet and generate the required .po/.ts/.php files!</span>
 </div>
 
 @if (Files.Count == 0)
 {
-    <InputFileUpload OnChange="@HandleSelectedFiles" Title="Upload images" />
+    <InputFileUpload OnChange="@HandleSelectedFiles" Title="Upload files" />
 }
 else
 {
