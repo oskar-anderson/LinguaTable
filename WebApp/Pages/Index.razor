@@ -7,33 +7,81 @@
 @using CsvHelper.Configuration
 @inject IJSRuntime Js
 
-<div class="d-flex flex-column align-items-center mx-auto" style="max-width: 800px">
-    <h1 class="fw-bold pt-3" style="color: #33333b;">Convert PO to CSV</h1>
-    <span class="fs-5 text-center">Stop wasting time manually editing translation files, store translations in a spreadsheet and generate the required .po/.ts/.php files!</span>
-</div>
-
-@if (Files.Count == 0)
-{
-    <InputFileUpload OnChange="@HandleSelectedFiles" Title="Upload files" />
-}
-else
-{
-    <div>
-        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px;">
-            @for (var i = 0; i < Files.Count; i++)
-            {
-                var fileIdx = i;
-                var file = Files[fileIdx];
-                <div class="p-2 card d-flex flex-row justify-content-between">
-                    <span class="d-flex align-items-center">@file.FileName</span>
-                    <button @onclick="() => RemoveFile(fileIdx)" class="btn btn-danger">X</button>
-                </div>
-            }
-        </div>
+<main class="js-page" style="flex-grow: 1; background-color: #f5f5fa; position: relative;">
+    <div class="js-drop-overlay" style="display: none; font-weight: 600; font-size: 28px; line-height: 30px; min-height: 100%; position: absolute; z-index: 9999; width: 100%; inset: 0; background-color: rgb(0, 0, 0, 0.8); text-align: center; color: #fff; padding: 230px;">
+        Drop files here!
     </div>
     
-    <button class="btn btn-primary mt-2" @onclick="DownloadCsv">Convert to CSV</button>
+    <div class="d-flex flex-column align-items-center mx-auto" style="max-width: 800px">
+        <h1 class="fw-bold pt-5" style="color: #33333b;">Convert PO to CSV</h1>
+        <span class="fs-5 text-center mb-5">Editing translation files made easy.</span>
+        
+        @if (Files.Count == 0)
+        {
+            <InputFileUpload OnChange="@HandleSelectedFiles" Title="Upload files"/>
+        }
+    </div>
+    
+    @if (Files.Count != 0)
+    {
+        <div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px;">
+                @for (var i = 0; i < Files.Count; i++)
+                {
+                    var fileIdx = i;
+                    var file = Files[fileIdx];
+                    <div class="p-2 card d-flex flex-row justify-content-between">
+                        <span class="d-flex align-items-center">@file.FileName</span>
+                        <button @onclick="() => RemoveFile(fileIdx)" class="btn btn-danger">X</button>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <button class="btn btn-primary mt-2" @onclick="DownloadCsv">Convert to CSV</button>
+    }
+</main>
+
+<script>
+document.querySelector('.js-page').addEventListener('dragover', (e) => {
+    e.preventDefault(); // This is necessary to allow a drop
+    // Check if user is dragging html elements on page (kind: 'string' | 'other')
+    if (Array.from(e.dataTransfer.items).some(x => x.kind !== 'file')) {
+        return;
+    }
+    document.querySelector('.js-drop-overlay').style.display = 'block';
+})
+
+document.querySelector('.js-page').addEventListener('drop', (e) => {
+    e.preventDefault();
+    console.log("drop");
+    document.querySelector('.js-drop-overlay').style.display = 'none';
+    
+    // items vs files - items (DataTransfer interface) is the new implementation, files is older (DataTransferItemList interface). Files do not exist on dragover
+    if (e.dataTransfer.items) {
+        for (let i = 0; i < e.dataTransfer.items.length; i++) {
+            if (e.dataTransfer.items[i].kind === 'file') {
+                let file = e.dataTransfer.items[i].getAsFile();
+                console.log('file[' + i + '].name = ' + file.name);
+                processFile(file);
+            }
+        }
+    } else {
+        for (let i = 0; i < e.dataTransfer.files.length; i++) {
+            console.log('file[' + i + '].name = ' + e.dataTransfer.files[i].name);
+            processFile(e.dataTransfer.files[i]);
+        }
+    }
+})
+
+function processFile(file) {
+    console.log('processFile');
 }
+
+document.querySelector('.js-page').addEventListener('dragleave', () => {
+    document.querySelector('.js-drop-overlay').style.display = 'none';
+})
+</script>
 
 @code {
     public Dictionary<POKey, List<string>> Translations = new();
